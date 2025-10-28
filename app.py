@@ -11,12 +11,14 @@ specialization=[{"name":"IT",
 def get_specializations():
     return {"specializations": specialization}
 
+
 @app.post("/specialization")
 def create_specialization():
     request_data=request.get_json()
     new_specialization={"name":request_data["name"],"course_items":[]}
     specialization.append(new_specialization)
     return new_specialization,201
+
 
 @app.post("/specialization/<string:name>/course_item")
 def create_course_item(name):
@@ -28,12 +30,14 @@ def create_course_item(name):
             return new_course_item,201
         return {"message":"specialization not found"},404
 
+
 @app.get("/specialization/<string:name>")
 def get_specialization(name):
     for spec in specialization:
         if spec["name"]==name:
             return spec
     return {"message":"specialization not found"},404
+
 
 @app.get("/specialization/<string:name>/course_item")
 def get_course_item_in_specialization(name):
