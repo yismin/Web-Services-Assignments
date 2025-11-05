@@ -1,5 +1,4 @@
-# app.py
-from flask import Flask, request, jsonify         
+"""from flask import Flask, request, jsonify         
 from flask_sqlalchemy import SQLAlchemy           
 from dotenv import load_dotenv                       
 import os
@@ -151,4 +150,4 @@ def delete_course_item(name, course_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=True)"""
