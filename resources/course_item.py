@@ -3,6 +3,7 @@ from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from db import course_items
+from schemas import Course_ItemSchema, Course_ItemUpdateSchema , Specializations_Schema
 
 blp = Blueprint("Course_Items", __name__, description="Operations on course_items")
 
@@ -21,14 +22,17 @@ class Course_Item(MethodView):
             return {"message": "Course_item deleted."}
         except KeyError:
             abort(404, message="Course_Item not found.")
+        
+    @blp.arguments(Course_ItemUpdateSchema)
+    @blp.response(200, Course_ItemUpdateSchema)
 
-    def put(self, course_item_id):
+    def put(self, course_item_data, course_item_id):
         course_item_data = request.get_json()
-        if "type" not in course_item_data or "name" not in course_item_data:
+        """if "type" not in course_item_data or "name" not in course_item_data:
             abort(
                 400,
                 message="Bad request. Ensure 'type', and 'name' are included in the JSON payload.",
-            )
+            )"""
         try:
             course_item = course_items[course_item_id]
             course_item |= course_item_data
@@ -38,14 +42,17 @@ class Course_Item(MethodView):
             abort(404, message="Course_Item not found.")
 
 
-@blp.route("/course_item")
-class ItemList(MethodView):
-    def get(self):
-        return {"course_items": list(course_items.values())}
+class Course_ItemList(MethodView):
+    @blp.response(200,Course_ItemSchema(many=True))
+    def get(self, course_item_id):
+        #return {"course_items": list(course_items.values())}
+        return course_items.values()
 
-    def post(self):
+    @blp.arguments(Course_ItemSchema)
+    @blp.response(201, Course_ItemSchema)
+    def post(self,course_item_data):
         course_item_data = request.get_json()
-        if (
+        """if (
             "type" not in course_item_data
             or "specialization_id" not in course_item_data
             or "name" not in course_item_data
@@ -53,7 +60,7 @@ class ItemList(MethodView):
             abort(
                 400,
                 message="Bad request. Ensure 'type', 'specialization_id', and 'name' are included in the JSON payload.",
-            )
+            )"""
         for course_item in course_items.values():
             if (
                 course_item_data["name"] == course_items["name"]

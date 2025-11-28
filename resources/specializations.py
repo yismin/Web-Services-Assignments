@@ -3,11 +3,13 @@ from uuid import uuid4
 from flask.views import MethodView
 from db import specializations
 from flask_smorest import Blueprint
+from schemas import Specializations_Schema
 
 blp = Blueprint("Specializations", __name__, description="Operations on specializations")
 
 @blp.route("/specialization/<string:specialization_id>")
 class Specialization(MethodView):
+    @blp.response(200, Specializations_Schema)
     def get(self, specialization_id):
         try:
             return specializations[specialization_id]
@@ -39,15 +41,18 @@ class Specialization(MethodView):
 
 @blp.route("/specialization")
 class SpecializationList(MethodView):
+    @blp.response(200, Specializations_Schema(many=True))
     def get(self):
         return {"specializations": list(specializations.values())}
-
-    def post(self):
+    
+    @blp.arguments(Specializations_Schema)
+    @blp.response(201, Specializations_Schema)
+    def post(self,specializations_data):
         specialization_data = request.get_json()
-        if "name" not in specialization_data:
+        """if "name" not in specialization_data:
             abort(400, description="Bad request. Ensure 'name' is included")
         
-        # Prevent duplicates
+       """ # Prevent duplicates
         for specialization in specializations.values():
             if specialization_data["name"] == specialization["name"]:
                 abort(400, description="Specialization already exists")
