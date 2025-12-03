@@ -2,74 +2,85 @@ import uuid
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from db import course_items
-from schemas import Course_ItemSchema, Course_ItemUpdateSchema , Specializations_Schema
+from db import db
+from models import Course_itemModel, SpecializationModel
+from schemas import Course_ItemSchema, Course_ItemUpdateSchema
 
 blp = Blueprint("Course_Items", __name__, description="Operations on course_items")
 
 
 @blp.route("/course_item/<string:course_item_id>")
 class Course_Item(MethodView):
+
+    @blp.response(200, Course_ItemSchema)
     def get(self, course_item_id):
-        try:
-            return course_items[course_item_id]
-        except KeyError:
+        course_item = Course_itemModel.query.get(course_item_id)
+        if not course_item:
             abort(404, message="Course_Item not found.")
+        return course_item
 
     def delete(self, course_item_id):
-        try:
-            del course_items[course_item_id]
-            return {"message": "Course_item deleted."}
-        except KeyError:
+        course_item = Course_itemModel.query.get(course_item_id)
+        if not course_item:
             abort(404, message="Course_Item not found.")
-        
+
+        db.session.delete(course_item)
+        db.session.commit()
+        return {"message": "Course_Item deleted."}
+
     @blp.arguments(Course_ItemUpdateSchema)
-    @blp.response(200, Course_ItemUpdateSchema)
-
+    @blp.response(200, Course_ItemSchema)
     def put(self, course_item_data, course_item_id):
-        course_item_data = request.get_json()
-        """if "type" not in course_item_data or "name" not in course_item_data:
-            abort(
-                400,
-                message="Bad request. Ensure 'type', and 'name' are included in the JSON payload.",
-            )"""
-        try:
-            course_item = course_items[course_item_id]
-            course_item |= course_item_data
-
-            return course_item
-        except KeyError:
+        course_item = Course_itemModel.query.get(course_item_id)
+        if not course_item:
             abort(404, message="Course_Item not found.")
 
+        # Prevent duplicate (same name + same specialization)
+        duplicate = Course_itemModel.query.filter(
+            Course_itemModel.name == course_item_data["name"],
+            Course_itemModel.specialization_id == course_item_data["specialization_id"],
+            Course_itemModel.id != course_item_id
+        ).first()
 
+        if duplicate:
+            abort(400, message="Course_Item with this name already exists in the specialization.")
+
+        course_item.name = course_item_data["name"]
+        course_item.type = course_item_data["type"]
+        course_item.specialization_id = course_item_data["specialization_id"]
+
+        db.session.commit()
+        return course_item
+
+@blp.route("/course_item")
 class Course_ItemList(MethodView):
-    @blp.response(200,Course_ItemSchema(many=True))
-    def get(self, course_item_id):
-        #return {"course_items": list(course_items.values())}
-        return course_items.values()
+
+    @blp.response(200, Course_ItemSchema(many=True))
+    def get(self):
+        return Course_itemModel.query.all()
 
     @blp.arguments(Course_ItemSchema)
     @blp.response(201, Course_ItemSchema)
-    def post(self,course_item_data):
-        course_item_data = request.get_json()
-        """if (
-            "type" not in course_item_data
-            or "specialization_id" not in course_item_data
-            or "name" not in course_item_data
-        ):
-            abort(
-                400,
-                message="Bad request. Ensure 'type', 'specialization_id', and 'name' are included in the JSON payload.",
-            )"""
-        for course_item in course_items.values():
-            if (
-                course_item_data["name"] == course_items["name"]
-                and course_item_data["specialization_id"] == course_items["specialization_id"]
-            ):
-                abort(400, message="Course_Item already exists.")
+    def post(self, course_item_data):
 
-        course_item_id = uuid.uuid4().hex
-        course_item = {**course_item_data, "id": course_item_id}
-        course_items[course_item_id] = course_item
+        # Check duplicate
+        existing = Course_itemModel.query.filter_by(
+            name=course_item_data["name"],
+            specialization_id=course_item_data["specialization_id"]
+        ).first()
 
-        return course_item
+        if existing:
+            abort(400, message="Course_Item already exists.")
+
+        # Create
+        new_item = Course_itemModel(
+            id=uuid.uuid4().hex,
+            name=course_item_data["name"],
+            type=course_item_data["type"],
+            specialization_id=course_item_data["specialization_id"]
+        )
+
+        db.session.add(new_item)
+        db.session.commit()
+
+        return new_item
