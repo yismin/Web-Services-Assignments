@@ -1,82 +1,63 @@
-from flask import request, abort
-from uuid import uuid4
+import uuid
+from flask import request
 from flask.views import MethodView
-from flask_smorest import Blueprint
-from schemas import Specializations_Schema
+from flask_smorest import Blueprint, abort
 from db import db
-from models import SpecializationModel   
+from models.specialization import Specialization_model
+from schemas import Specialization_Schema, PlainSpecialization_Schema, SpecializationUpdateSchema  # We'll need an update schema
 
-blp = Blueprint("Specializations", __name__, description="Operations on specializations")
+blp = Blueprint("specializations", __name__, description="Operations on specializations")
 
 @blp.route("/specialization/<string:specialization_id>")
 class Specialization(MethodView):
-
-    @blp.response(200, Specializations_Schema)
+    @blp.response(200, PlainSpecialization_Schema)
     def get(self, specialization_id):
-        specialization = SpecializationModel.query.get(specialization_id)
-        if not specialization:
-            abort(404, description="Specialization not found")
+        specialization = Specialization_model.query.get_or_404(specialization_id)
         return specialization
-
+    
+    @blp.arguments(SpecializationUpdateSchema)  # Add this decorator
+    @blp.response(200, PlainSpecialization_Schema)
+    def put(self, specialization_data, specialization_id):  # Add this method
+        specialization = Specialization_model.query.get_or_404(specialization_id)
+        
+        # Check if name is being updated and if it already exists (excluding current)
+        if "name" in specialization_data:
+            existing = Specialization_model.query.filter(
+                Specialization_model.name == specialization_data["name"],
+                Specialization_model.id != specialization_id
+            ).first()
+            if existing:
+                abort(400, message="A specialization with that name already exists.")
+            specialization.name = specialization_data["name"]
+        
+        db.session.commit()
+        return specialization
+    
     def delete(self, specialization_id):
-        specialization = SpecializationModel.query.get(specialization_id)
-        if not specialization:
-            abort(404, description="Specialization not found")
-
+        specialization = Specialization_model.query.get_or_404(specialization_id)
         db.session.delete(specialization)
         db.session.commit()
-        return {"message": "Specialization deleted"}
-
-    def put(self, specialization_id):
-        specialization = SpecializationModel.query.get(specialization_id)
-        if not specialization:
-            abort(404, description="Specialization not found")
-
-        data = request.get_json()
-        if not data or "name" not in data:
-            abort(400, description="Bad request. 'name' is required")
-
-        # Prevent duplicate names
-        duplicate = SpecializationModel.query.filter(
-            SpecializationModel.name == data["name"],
-            SpecializationModel.id != specialization_id
-        ).first()
-
-        if duplicate:
-            abort(400, description="Specialization name already exists")
-
-        specialization.name = data["name"]
-        db.session.commit()
-
-        return specialization
+        return {"message": "Specialization deleted."}
 
 
 @blp.route("/specialization")
 class SpecializationList(MethodView):
-
-    @blp.response(200, Specializations_Schema(many=True))
+    @blp.response(200, PlainSpecialization_Schema(many=True))
     def get(self):
-        return SpecializationModel.query.all()
-
-    @blp.arguments(Specializations_Schema)
-    @blp.response(201, Specializations_Schema)
-    def post(self, specializations_data):
-
-        # Check duplicates
-        existing = SpecializationModel.query.filter_by(
-            name=specializations_data["name"]
-        ).first()
-
-        if existing:
-            abort(400, description="Specialization already exists")
-
-        # Create
-        specialization = SpecializationModel(
-            id=uuid4().hex,
-            name=specializations_data["name"]
-        )
-
+        return Specialization_model.query.all()
+    
+    @blp.arguments(Specialization_Schema)
+    @blp.response(201, PlainSpecialization_Schema)
+    def post(self, specialization_data):
+        # Check if specialization with same name already exists
+        if Specialization_model.query.filter_by(name=specialization_data["name"]).first():
+            abort(400, message="Specialization already exists.")
+        
+        # Create new specialization
+        specialization = Specialization_model(name=specialization_data["name"])
+        
+        # Add to database
         db.session.add(specialization)
         db.session.commit()
-
+        
         return specialization

@@ -1,2 +1,2 @@
-from models.specialization import SpecializationModel
+from models.specialization import Specialization_model
 from models.course_item import Course_itemModel
