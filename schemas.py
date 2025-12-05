@@ -22,3 +22,8 @@ class Course_ItemSchema(PlainCourse_ItemSchema):
 
 class Specialization_Schema(PlainSpecialization_Schema):
     course_items = fields.Nested(PlainCourse_ItemSchema, many=True, dump_only=True)
+
+class UserSchema(Schema):
+    id = fields.Int(dump_only=True)
+    username = fields.Str(required=True)
+    password = fields.Str(required=True, load_only=True)  # Never return password in response

@@ -4,6 +4,9 @@ from resources.course_item import blp as CourseItemBlueprint
 from resources.specializations import blp as SpecializationBlueprint
 from db import db
 import os
+from flask_jwt_extended import JWTManager
+from resources.user import blp as UserBlueprint, jwt_blocklist
+
 
 def create_app(db_url=None):
     app = Flask(__name__)
@@ -17,13 +20,26 @@ def create_app(db_url=None):
     app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui/"
     app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/"
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url or os.getenv("DATABASE_URL", "sqlite:///data.db")
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False  # Add this
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False 
+    # JWT Configuration
+    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-this")
     
     # Initialize database with app
     db.init_app(app)
     
+    # Initialize JWT
+    jwt = JWTManager(app)
+
     api = Api(app)
     
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        jti = jwt_payload.get("jti")
+        return jti in jwt_blocklist
+
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        return {"message": "The token has been revoked"}, 401
     # Create tables
     with app.app_context():
         db.create_all()
@@ -31,5 +47,7 @@ def create_app(db_url=None):
     # Register blueprints
     api.register_blueprint(CourseItemBlueprint)
     api.register_blueprint(SpecializationBlueprint)
+    api.register_blueprint(UserBlueprint)
+
     
     return app
